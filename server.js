@@ -46,7 +46,7 @@ try {
 // Configuration Nodemailer
 let transporter;
 try {
-    transporter = nodemailer.createTransporter({
+    transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: process.env.SMTP_PORT,
         secure: false,
