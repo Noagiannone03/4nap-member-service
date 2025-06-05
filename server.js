@@ -288,9 +288,7 @@ app.post('/api/send-helloasso-webhook', async (req, res) => {
 // Fonction pour envoyer l'email de bienvenue HelloAsso
 async function sendWelcomeEmailWithMembership(email, firstName, lastName, purchaseAmount, memberId, expirationDate) {
     try {
-        // Générer QR code avec les infos membre
-        const qrData = `Membre 4nap: ${firstName} ${lastName} - ID: ${memberId} - Expire: ${expirationDate.toLocaleDateString('fr-FR')}`;
-        const qrCodeDataURL = await generateQRCode(qrData);
+        // Pas de QR code dans l'email - redirection vers le site web
         
         const emailHtml = `
         <!DOCTYPE html>
@@ -323,10 +321,17 @@ async function sendWelcomeEmailWithMembership(email, firstName, lastName, purcha
                     <p>Pour vous remercier de votre confiance, nous avons le plaisir de vous <strong>offrir un abonnement de membre du Fort Napoléon pendant 12 mois</strong> ! 🏰✨</p>
                     
                     <div class="qr-section">
-                        <h3>🎁 Votre Carte Membre est prête !</h3>
-                        <img src="${qrCodeDataURL}" alt="QR Code Membre" style="max-width: 200px; margin: 20px 0;">
-                        <p><strong>Présentez ce QR code</strong> lors de votre visite au Fort Napoléon</p>
-                        <p><small>💡 <strong>Astuce :</strong> Sauvegardez cette image ou imprimez cet email !</small></p>
+                        <h3>🎁 Votre Pass Membre vous attend !</h3>
+                        <p>Pour obtenir votre carte membre avec QR code, cliquez sur le bouton ci-dessous :</p>
+                        
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="https://4nap.fr/?welcome=${memberId}&email=${encodeURIComponent(email)}&name=${encodeURIComponent(firstName + ' ' + lastName)}" 
+                               style="background: linear-gradient(135deg, #00ff88, #0099ff); color: white; text-decoration: none; padding: 15px 30px; border-radius: 8px; font-weight: 600; display: inline-block; transition: transform 0.2s;">
+                                🎫 Générer ma Carte Membre
+                            </a>
+                        </div>
+                        
+                        <p><small>💡 <strong>Astuce :</strong> Ce lien vous amènera sur notre site pour créer votre carte personnalisée !</small></p>
                     </div>
                     
                     <div class="fort-info">
