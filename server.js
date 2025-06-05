@@ -225,8 +225,8 @@ app.post('/webhook/helloasso', async (req, res) => {
         
         const webhookData = req.body;
         
-        // Vérifier que c'est bien un paiement
-        if (webhookData.eventType === 'Payment' && webhookData.data) {
+        // Vérifier que c'est bien un paiement ou une commande
+        if ((webhookData.eventType === 'Payment' || webhookData.eventType === 'Order') && webhookData.data) {
             const data = webhookData.data;
             const payer = data.payer;
             
@@ -234,9 +234,10 @@ app.post('/webhook/helloasso', async (req, res) => {
             const email = payer.email;
             const firstName = payer.firstName || 'Ami(e)';
             const lastName = payer.lastName || '';
-            const amount = data.amount / 100; // HelloAsso envoie en centimes
+            // Montant : peut être dans data.amount (Payment) ou data.amount.total (Order)
+            const amount = (data.amount && typeof data.amount === 'number' ? data.amount : data.amount?.total || 0) / 100;
             
-            console.log(`💰 Nouveau paiement de ${firstName} ${lastName} (${email}) : ${amount}€`);
+            console.log(`💰 Nouveau ${webhookData.eventType} de ${firstName} ${lastName} (${email}) : ${amount}€`);
             
             // Générer un ID membre unique
             const memberId = 'HA-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -250,7 +251,7 @@ app.post('/webhook/helloasso', async (req, res) => {
             
             res.status(200).json({ success: true, message: 'Webhook traité avec succès' });
         } else {
-            console.log('ℹ️ Webhook ignoré - pas un paiement:', webhookData.eventType);
+            console.log('ℹ️ Webhook ignoré - type non traité:', webhookData.eventType);
             res.status(200).json({ success: true, message: 'Webhook reçu mais ignoré' });
         }
         
