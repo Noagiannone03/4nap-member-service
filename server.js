@@ -214,6 +214,61 @@ app.post('/webhook/helloasso', async (req, res) => {
     }
 });
 
+// Route de test pour simuler un webhook HelloAsso
+app.post('/api/send-helloasso-webhook', async (req, res) => {
+    try {
+        const { email, prenom, montant } = req.body;
+        
+        console.log(`🧪 Test webhook HelloAsso: ${prenom} (${email}) - ${montant}€`);
+        
+        // Simuler un webhook HelloAsso
+        const fakeWebhook = {
+            eventType: 'Payment',
+            data: {
+                amount: montant * 100, // Convertir en centimes
+                payer: {
+                    email: email,
+                    firstName: prenom,
+                    lastName: 'Test'
+                },
+                order: {
+                    id: `test_${Date.now()}`
+                }
+            }
+        };
+        
+        // Traiter comme un vrai webhook
+        const payment = fakeWebhook.data;
+        const payer = payment.payer;
+        
+        const memberId = 'TEST-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const expirationDate = new Date();
+        expirationDate.setFullYear(expirationDate.getFullYear() + 1);
+        
+        const member = {
+            id: memberId,
+            firstName: payer.firstName,
+            lastName: payer.lastName,
+            email: payer.email,
+            type: 'Membre Fort Nap (Test)',
+            expirationDate: expirationDate.toLocaleDateString('fr-FR'),
+            source: 'HelloAsso Test'
+        };
+        
+        await sendWelcomeEmailWithPass(member, montant);
+        
+        res.json({ 
+            success: true, 
+            message: 'Email de test envoyé avec succès',
+            memberId: memberId
+        });
+        
+    } catch (error) {
+        console.error('❌ Erreur test webhook:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Configuration des routes wallet
 setupWalletRoutes(app);
 
