@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscription 4nap | Devenez Membre Fort Napoléon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="inscription.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <span class="logo-text">4nap</span>
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">← Retour</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="inscription-hero">
+        <div class="hero-bg">
+            <div class="particles" id="particles"></div>
+        </div>
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <span class="badge-icon">🎯</span>
+                    <span>Inscription Membre 4nap</span>
+                </div>
+                <h1 class="hero-title">
+                    <span class="title-line">Bienvenue dans</span>
+                    <span class="title-line gradient-text">l'aventure 4nap</span>
+                </h1>
+                <p class="hero-description">
+                    Complétez votre inscription pour rejoindre la communauté Fort Napoléon 
+                    et recevoir votre pass fidélité unique.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Inscription Form Section -->
+    <section class="inscription-form-section">
+        <div class="container">
+            <div class="form-container">
+                <div class="form-sidebar">
+                    <div class="membership-info">
+                        <h3>Votre Membership 4nap</h3>
+                        <div class="membership-features">
+                            <div class="feature-item">
+                                <div class="feature-icon">📅</div>
+                                <div>
+                                    <h4>Abonnement Annuel</h4>
+                                    <p>Membre pendant 12 mois</p>
+                                </div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">📱</div>
+                                <div>
+                                    <h4>Pass QR Code</h4>
+                                    <p>Accès via QR code unique</p>
+                                </div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">🎁</div>
+                                <div>
+                                    <h4>Programme Fidélité</h4>
+                                    <p>Avantages exclusifs</p>
+                                </div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">✉️</div>
+                                <div>
+                                    <h4>Pass par Email</h4>
+                                    <p>PDF envoyé automatiquement</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="membership-card-preview">
+                            <div class="card-preview">
+                                <div class="card-header">
+                                    <span class="card-logo">4nap</span>
+                                    <span class="card-type">MEMBRE</span>
+                                </div>
+                                <div class="qr-placeholder">
+                                    <div class="qr-animation"></div>
+                                </div>
+                                <div class="card-footer">
+                                    <span>Pass Fidélité</span>
+                                    <span>Fort Napoléon</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-main">
+                    <div class="form-header">
+                        <h2>Informations Personnelles</h2>
+                        <p>Vos données sont sécurisées et utilisées uniquement pour votre membership.</p>
+                    </div>
+
+                    <form id="inscriptionForm" class="inscription-form">
+                        <div class="form-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                            <span class="progress-text">Étape <span id="currentStep">1</span> sur 3</span>
+                        </div>
+
+                        <!-- Étape 1: Informations personnelles -->
+                        <div class="form-step active" data-step="1">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="prenom">Prénom *</label>
+                                    <input type="text" id="prenom" name="prenom" required>
+                                    <span class="form-error"></span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="nom">Nom *</label>
+                                    <input type="text" id="nom" name="nom" required>
+                                    <span class="form-error"></span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="email">Email *</label>
+                                <input type="email" id="email" name="email" required>
+                                <span class="form-error"></span>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="telephone">Téléphone</label>
+                                <input type="tel" id="telephone" name="telephone">
+                                <span class="form-error"></span>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="dateNaissance">Date de naissance</label>
+                                <input type="date" id="dateNaissance" name="dateNaissance">
+                                <span class="form-error"></span>
+                            </div>
+                        </div>
+
+                        <!-- Étape 2: Adresse -->
+                        <div class="form-step" data-step="2">
+                            <div class="form-group">
+                                <label for="adresse">Adresse *</label>
+                                <input type="text" id="adresse" name="adresse" required>
+                                <span class="form-error"></span>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="codePostal">Code postal *</label>
+                                    <input type="text" id="codePostal" name="codePostal" required>
+                                    <span class="form-error"></span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="ville">Ville *</label>
+                                    <input type="text" id="ville" name="ville" required>
+                                    <span class="form-error"></span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="pays">Pays *</label>
+                                <select id="pays" name="pays" required>
+                                    <option value="">Sélectionnez un pays</option>
+                                    <option value="FR">France</option>
+                                    <option value="BE">Belgique</option>
+                                    <option value="CH">Suisse</option>
+                                    <option value="CA">Canada</option>
+                                    <option value="other">Autre</option>
+                                </select>
+                                <span class="form-error"></span>
+                            </div>
+                        </div>
+
+                        <!-- Étape 3: Type de membre et finalisation -->
+                        <div class="form-step" data-step="3">
+                            <div class="form-group">
+                                <label for="typeMembre">Type de membre *</label>
+                                <div class="member-types">
+                                    <div class="member-type-option" data-type="annuel">
+                                        <input type="radio" id="membre-annuel" name="typeMembre" value="annuel" checked>
+                                        <label for="membre-annuel">
+                                            <div class="option-header">
+                                                <h4>Membre Annuel</h4>
+                                                <span class="price">99€/an</span>
+                                            </div>
+                                            <p>Accès complet pendant 12 mois</p>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="newsletter" name="newsletter">
+                                    <span class="checkbox-custom"></span>
+                                    <span>Je souhaite recevoir la newsletter 4nap</span>
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="conditions" name="conditions" required>
+                                    <span class="checkbox-custom"></span>
+                                    <span>J'accepte les <a href="#" class="link">conditions d'utilisation</a> et la <a href="#" class="link">politique de confidentialité</a> *</span>
+                                </label>
+                                <span class="form-error"></span>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" id="prevBtn" style="display: none;">
+                                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                                </svg>
+                                <span>Précédent</span>
+                            </button>
+                            
+                            <button type="button" class="btn btn-primary" id="nextBtn">
+                                <span>Suivant</span>
+                                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                                </svg>
+                            </button>
+                            
+                            <button type="submit" class="btn btn-gradient" id="submitBtn" style="display: none;">
+                                <span>Finaliser l'inscription</span>
+                                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M20 6L9 17l-5-5"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Loading Modal -->
+    <div class="modal" id="loadingModal" style="display: none;">
+        <div class="modal-content">
+            <div class="loading-animation">
+                <div class="spinner"></div>
+                <h3>Création de votre membership...</h3>
+                <p>Génération de votre pass QR code unique</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal" id="successModal" style="display: none;">
+        <div class="modal-content success">
+            <div class="success-animation">
+                <div class="checkmark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                </div>
+                <h3>Bienvenue dans l'équipe 4nap !</h3>
+                <p>Votre membership a été créé avec succès.</p>
+                
+                <div class="qr-code-display" id="qrCodeDisplay">
+                    <!-- QR Code généré ici -->
+                </div>
+                
+                <div class="success-info">
+                    <div class="info-item">
+                        <span class="info-icon">📧</span>
+                        <span>Un email avec votre pass a été envoyé</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">📱</span>
+                        <span>Votre QR code est unique et personnel</span>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="window.location.href='/'">
+                    Retour à l'accueil
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="inscription.js"></script>
+</body>
+</html> 
