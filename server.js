@@ -10,8 +10,8 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 require('dotenv').config();
 
-// Import wallet integration (version simple - sans API)
-const { generateSimpleWalletButtons, setupSimpleWalletRoutes } = require('./wallet-simple');
+// Import wallet integration
+const { generateWalletButtons, setupWalletRoutes } = require('./wallet-integration');
 
 // Configuration de l'application
 const app = express();
@@ -160,8 +160,62 @@ app.post('/api/send-membership-email', emailLimiter, async (req, res) => {
     }
 });
 
-// Configuration des routes wallet (version simple)
-setupSimpleWalletRoutes(app);
+// Route pour recevoir les webhooks HelloAsso
+app.post('/webhook/helloasso', async (req, res) => {
+    try {
+        console.log('🎯 Webhook HelloAsso reçu:', JSON.stringify(req.body, null, 2));
+        
+        const webhookData = req.body;
+        
+        // Vérifier que c'est bien un paiement
+        if (webhookData.eventType === 'Payment' && webhookData.data) {
+            const payment = webhookData.data;
+            const order = payment.order;
+            const payer = payment.payer;
+            
+            // Extraire les informations importantes
+            const email = payer.email;
+            const firstName = payer.firstName || 'Ami(e)';
+            const lastName = payer.lastName || '';
+            const amount = payment.amount / 100; // HelloAsso envoie en centimes
+            
+            console.log(`💰 Nouveau paiement de ${firstName} ${lastName} (${email}) : ${amount}€`);
+            
+            // Générer un ID membre unique
+            const memberId = 'HA-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            
+            // Calculer la date d'expiration (12 mois)
+            const expirationDate = new Date();
+            expirationDate.setFullYear(expirationDate.getFullYear() + 1);
+            
+            // Créer le member pour le pass
+            const member = {
+                id: memberId,
+                firstName: firstName,
+                lastName: lastName,
+                email: email,
+                type: 'Membre Fort Nap',
+                expirationDate: expirationDate.toLocaleDateString('fr-FR'),
+                source: 'HelloAsso Purchase'
+            };
+            
+            // Envoyer l'email de bienvenue avec pass
+            await sendWelcomeEmailWithPass(member, amount);
+            
+            res.status(200).json({ success: true, message: 'Webhook traité avec succès' });
+        } else {
+            console.log('ℹ️ Webhook ignoré - pas un paiement:', webhookData.eventType);
+            res.status(200).json({ success: true, message: 'Webhook reçu mais ignoré' });
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur webhook HelloAsso:', error);
+        res.status(500).json({ error: 'Erreur interne du serveur' });
+    }
+});
+
+// Configuration des routes wallet
+setupWalletRoutes(app);
 
 // Fonctions utilitaires
 
@@ -311,7 +365,7 @@ async function sendMembershipEmail(member, pdfPath) {
 
 // Génération du HTML de l'email
 function generateEmailHTML(member) {
-    const walletButtons = generateSimpleWalletButtons(member);
+    const walletButtons = generateWalletButtons(member);
     
     return `
     <!DOCTYPE html>
@@ -345,7 +399,7 @@ function generateEmailHTML(member) {
                     <p><strong>ID Membre:</strong> ${member.memberId}</p>
                 </div>
                 
-                ${walletButtons.simpleButtons}
+                ${walletButtons.bothButtons}
                 
                 <p>📱 Votre pass fidélité QR code unique est également joint à cet email en PDF.</p>
                 <p>🏰 Nous avons hâte de vous accueillir au Fort Napoléon !</p>
@@ -364,6 +418,107 @@ function generateEmailHTML(member) {
     </body>
     </html>
     `;
+}
+
+// Fonction pour envoyer l'email de bienvenue avec pass membre
+async function sendWelcomeEmailWithPass(member, purchaseAmount) {
+    try {
+        // Générer les liens wallet
+        const googleWalletUrl = `https://4nap.fr/wallet/google/${member.id}`;
+        const appleWalletUrl = `https://4nap.fr/wallet/apple/${member.id}`;
+        
+        const emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f5f7fa; }
+                .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }
+                .content { padding: 40px 30px; }
+                .highlight { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold; }
+                .wallet-section { background: #f8f9ff; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center; }
+                .wallet-buttons { display: flex; gap: 15px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
+                .wallet-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: transform 0.2s; }
+                .google-wallet { background: #4285f4; color: white; }
+                .apple-wallet { background: #000; color: white; }
+                .wallet-btn:hover { transform: translateY(-2px); }
+                .fort-info { background: #e8f4fd; border-left: 4px solid #2196F3; padding: 20px; margin: 20px 0; border-radius: 8px; }
+                .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 14px; }
+                .emoji { font-size: 1.2em; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🎉 Merci ${member.firstName} !</h1>
+                    <p>Votre achat nous fait énormément plaisir</p>
+                </div>
+                
+                <div class="content">
+                    <p>Bonjour <strong>${member.firstName}</strong> ! 👋</p>
+                    
+                    <p>Nous venons de voir que vous avez effectué un achat de <span class="highlight">${purchaseAmount}€</span> sur notre billetterie HelloAsso ! 🎫</p>
+                    
+                    <p>Pour vous remercier de votre confiance, nous avons le plaisir de vous <strong>offrir un abonnement de membre du Fort Napoléon pendant 12 mois</strong> ! 🏰✨</p>
+                    
+                    <div class="wallet-section">
+                        <h3>🎁 Votre Pass Membre est prêt !</h3>
+                        <p>Ajoutez-le directement à votre smartphone :</p>
+                        
+                        <div class="wallet-buttons">
+                            <a href="${googleWalletUrl}" class="wallet-btn google-wallet">
+                                📱 Ajouter à Google Wallet
+                            </a>
+                            <a href="${appleWalletUrl}" class="wallet-btn apple-wallet">
+                                🍎 Ajouter à Apple Wallet
+                            </a>
+                        </div>
+                        
+                        <p><small>💡 <strong>Astuce :</strong> Votre pass sera toujours accessible dans l'app Wallet de votre téléphone !</small></p>
+                    </div>
+                    
+                    <div class="fort-info">
+                        <h4>🏰 Votre abonnement membre inclut :</h4>
+                        <ul>
+                            <li><strong>Accès privilégié</strong> au Fort Napoléon</li>
+                            <li><strong>Réductions</strong> sur nos événements</li>
+                            <li><strong>Invitations</strong> aux vernissages privés</li>
+                            <li><strong>Newsletter exclusive</strong> avec les coulisses</li>
+                        </ul>
+                        <p><strong>📅 Valable jusqu'au ${member.expirationDate}</strong></p>
+                    </div>
+                    
+                    <p>Nous avons hâte de vous accueillir au Fort Napoléon ! 🌊</p>
+                    
+                    <p>L'équipe 4nap 💙</p>
+                </div>
+                
+                <div class="footer">
+                    <p>🏰 Fort Napoléon • La Seyne-sur-Mer<br>
+                    📧 contact@4nap.fr • 🌐 4nap.fr</p>
+                </div>
+            </div>
+        </body>
+        </html>`;
+        
+        const mailOptions = {
+            from: process.env.SMTP_USER,
+            to: member.email,
+            subject: `🎁 ${member.firstName}, votre pass membre Fort Napoléon vous attend !`,
+            html: emailHtml
+        };
+        
+        const result = await transporter.sendMail(mailOptions);
+        console.log(`✅ Email de bienvenue envoyé à ${member.email}:`, result.messageId);
+        
+        return result;
+        
+    } catch (error) {
+        console.error('❌ Erreur envoi email de bienvenue:', error);
+        throw error;
+    }
 }
 
 // Gestion des erreurs 404
