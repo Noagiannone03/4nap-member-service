@@ -10,6 +10,9 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 require('dotenv').config();
 
+// Import wallet integration
+const { generateWalletButtons, setupWalletRoutes } = require('./wallet-integration');
+
 // Configuration de l'application
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -156,6 +159,9 @@ app.post('/api/send-membership-email', emailLimiter, async (req, res) => {
         });
     }
 });
+
+// Configuration des routes wallet
+setupWalletRoutes(app);
 
 // Fonctions utilitaires
 
@@ -305,6 +311,8 @@ async function sendMembershipEmail(member, pdfPath) {
 
 // Génération du HTML de l'email
 function generateEmailHTML(member) {
+    const walletButtons = generateWalletButtons(member);
+    
     return `
     <!DOCTYPE html>
     <html lang="fr">
@@ -336,8 +344,21 @@ function generateEmailHTML(member) {
                     <p><strong>Email:</strong> ${member.email}</p>
                     <p><strong>ID Membre:</strong> ${member.memberId}</p>
                 </div>
-                <p>📱 Votre pass fidélité QR code unique est joint à cet email en PDF.</p>
+                
+                ${walletButtons.bothButtons}
+                
+                <p>📱 Votre pass fidélité QR code unique est également joint à cet email en PDF.</p>
                 <p>🏰 Nous avons hâte de vous accueillir au Fort Napoléon !</p>
+                
+                <div style="margin-top: 30px; padding: 20px; background: #e8f4fd; border-radius: 10px; border-left: 4px solid #00d4ff;">
+                    <h4 style="margin: 0 0 10px 0; color: #0066cc;">💡 Comment utiliser votre pass :</h4>
+                    <ul style="margin: 10px 0; padding-left: 20px; color: #333;">
+                        <li>🎯 <strong>Ajoutez à votre wallet</strong> : Cliquez sur un bouton ci-dessus</li>
+                        <li>📱 <strong>Accès rapide</strong> : Votre QR code sera accessible depuis l'écran de verrouillage</li>
+                        <li>🏰 <strong>Au Fort</strong> : Présentez le QR code à l'entrée</li>
+                        <li>📄 <strong>Alternative</strong> : Utilisez le PDF joint à cet email</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </body>

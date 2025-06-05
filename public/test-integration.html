@@ -97,6 +97,7 @@
         <div class="test-section">
             <h3>🔗 Test Connexion</h3>
             <button onclick="testConnection()">Tester API</button>
+            <button onclick="testSSL()">Diagnostic SSL</button>
         </div>
         
         <div class="test-section">
@@ -123,10 +124,55 @@
             log('🔗 Test connexion...');
             try {
                 const response = await fetch(`${API_URL}/api/test`);
-                const data = await response.json();
-                log(`✅ Connexion OK: ${JSON.stringify(data)}`);
+                log(`📊 Status: ${response.status} ${response.statusText}`);
+                log(`🔐 HTTPS: ${response.url.startsWith('https') ? 'OK' : 'NON'}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Connexion OK: ${JSON.stringify(data)}`);
+                } else {
+                    const text = await response.text();
+                    log(`❌ Erreur HTTP ${response.status}: ${text.substring(0, 200)}`);
+                }
             } catch (error) {
                 log(`❌ Erreur: ${error.message}`);
+                if (error.message.includes('SSL') || error.message.includes('certificate')) {
+                    log(`🚨 PROBLÈME SSL DÉTECTÉ!`);
+                    log(`💡 Solutions possibles:`);
+                    log(`   1. Certificat SSL expiré ou invalide`);
+                    log(`   2. Certificat auto-signé`);
+                    log(`   3. Configuration SSL incorrecte sur le serveur`);
+                }
+            }
+        }
+        
+        async function testSSL() {
+            log('🔐 Diagnostic SSL...');
+            
+            // Test avec différentes méthodes
+            const tests = [
+                { name: 'Test standard', options: {} },
+                { name: 'Test sans cache', options: { cache: 'no-cache' } },
+                { name: 'Test CORS', options: { mode: 'cors' } }
+            ];
+            
+            for (const test of tests) {
+                try {
+                    log(`\n🧪 ${test.name}...`);
+                    const response = await fetch(`${API_URL}/api/test`, test.options);
+                    log(`✅ ${test.name}: ${response.status}`);
+                } catch (error) {
+                    log(`❌ ${test.name}: ${error.message}`);
+                }
+            }
+            
+            // Test ping simple vers le domaine
+            try {
+                log(`\n🌐 Test domaine principal...`);
+                const response = await fetch('https://4nap.fr', { mode: 'no-cors' });
+                log(`✅ Domaine principal accessible`);
+            } catch (error) {
+                log(`❌ Domaine principal: ${error.message}`);
             }
         }
         
