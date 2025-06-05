@@ -1,3 +1,25 @@
+// Import Firebase (ajouté en haut du fichier)
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getFirestore, collection, addDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+// Configuration Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyCK20ovvLNY9lBSr7FotjXPU1mwHsg8pnk",
+    authDomain: "nap-festival.firebaseapp.com",
+    projectId: "nap-festival",
+    storageBucket: "nap-festival.firebasestorage.app",
+    messagingSenderId: "928048730953",
+    appId: "1:928048730953:web:47cad1e4c5d300a11b4098",
+    measurementId: "G-481JX6JFMD"
+};
+
+// Initialiser Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// URL du serveur email (modifiable selon l'hébergement)
+const EMAIL_SERVER_URL = 'http://185.98.137.153:3000';
+
 // Configuration et variables globales
 let currentStep = 1;
 const totalSteps = 3;
@@ -363,45 +385,76 @@ async function submitForm() {
         // Afficher le modal de chargement
         showLoadingModal();
         
+        // Générer un ID unique pour le membre
+        const memberId = generateUniqueId();
+        
         // Préparer les données
         const memberData = {
+            id: memberId,
             ...formData,
             dateInscription: new Date().toISOString(),
             dateDebutAbonnement: new Date().toISOString(),
             dateFinAbonnement: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // +1 an
             statut: 'actif',
-            renouvele: false
+            renouvele: false,
+            emailEnvoye: false
         };
         
-        console.log('Données à envoyer:', memberData);
+        console.log('Sauvegarde dans Firebase:', memberData);
         
-        // Envoyer les données au serveur
-        const response = await fetch('/api/membres', {
+        // 1. Sauvegarder dans Firebase
+        try {
+            const docRef = await addDoc(collection(db, 'membres'), memberData);
+            console.log('✅ Membre sauvegardé dans Firebase:', docRef.id);
+        } catch (firebaseError) {
+            console.error('⚠️ Erreur Firebase:', firebaseError);
+            // On continue même si Firebase échoue
+        }
+        
+        // 2. Envoyer l'email via le serveur VPS
+        const emailData = {
+            memberId: memberId,
+            email: memberData.email,
+            prenom: memberData.prenom,
+            nom: memberData.nom,
+            typeMembre: memberData.typeMembre || 'annuel'
+        };
+        
+        console.log('Envoi email via VPS:', emailData);
+        
+        const emailResponse = await fetch(`${EMAIL_SERVER_URL}/api/send-membership-email`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(memberData)
+            body: JSON.stringify(emailData)
         });
         
-        if (!response.ok) {
-            throw new Error(`Erreur HTTP: ${response.status}`);
+        let qrCodeData = null;
+        if (emailResponse.ok) {
+            const emailResult = await emailResponse.json();
+            qrCodeData = emailResult.qrCode;
+            console.log('✅ Email envoyé avec succès');
+        } else {
+            console.warn('⚠️ Erreur envoi email, mais membre créé');
         }
-        
-        const result = await response.json();
-        console.log('Réponse du serveur:', result);
         
         // Masquer le modal de chargement
         hideLoadingModal();
         
-        // Afficher le modal de succès avec le QR code
-        showSuccessModal(result.qrCode, result.memberId);
+        // Afficher le modal de succès
+        showSuccessModal(qrCodeData, memberId);
         
     } catch (error) {
-        console.error('Erreur lors de l\'inscription:', error);
+        console.error('❌ Erreur lors de l\'inscription:', error);
         hideLoadingModal();
-        showErrorMessage('Une erreur est survenue lors de l\'inscription. Veuillez réessayer.');
+        showErrorMessage('Une erreur est survenue lors de l\'inscription. Votre compte a pu être créé, vérifiez vos emails.');
     }
+}
+
+// Générer un ID unique
+function generateUniqueId() {
+    return 'member_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
 // Afficher le modal de chargement
