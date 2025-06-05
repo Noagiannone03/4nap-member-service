@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test API 4nap</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; background: #007bff; color: white; border: none; border-radius: 5px; }
+        #result { margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Test API 4nap</h1>
+    
+    <button onclick="testServer()">Test Serveur Status</button>
+    <button onclick="testEmail()">Test Envoi Email</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        const EMAIL_SERVER_URL = 'http://185.98.137.153:3000';
+        
+        async function testServer() {
+            const result = document.getElementById('result');
+            result.innerHTML = 'Test en cours...';
+            
+            try {
+                const response = await fetch(`${EMAIL_SERVER_URL}/api/test`);
+                const data = await response.json();
+                result.innerHTML = `✅ Serveur OK: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                result.innerHTML = `❌ Erreur: ${error.message}`;
+            }
+        }
+        
+        async function testEmail() {
+            const result = document.getElementById('result');
+            result.innerHTML = 'Test email en cours...';
+            
+            const testData = {
+                memberId: 'test_' + Date.now(),
+                email: 'test@example.com',
+                prenom: 'Test',
+                nom: 'User',
+                typeMembre: 'annuel'
+            };
+            
+            try {
+                const response = await fetch(`${EMAIL_SERVER_URL}/api/send-membership-email`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const data = await response.json();
+                result.innerHTML = `✅ Email OK: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                result.innerHTML = `❌ Erreur: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html> 

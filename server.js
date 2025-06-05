@@ -39,9 +39,24 @@ app.use(helmet({
 // CORS permissif pour accepter tous les domaines
 app.use(cors({
     origin: '*',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false
 }));
+
+// Headers CORS supplémentaires
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Répondre aux requêtes OPTIONS (preflight)
+    if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+    } else {
+        next();
+    }
+});
 
 // Limitation du taux de requêtes
 const emailLimiter = rateLimit({

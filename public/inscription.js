@@ -18,7 +18,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // URL du serveur email (modifiable selon l'hébergement)
-const EMAIL_SERVER_URL = 'http://185.98.137.153';
+const EMAIL_SERVER_URL = 'http://185.98.137.153:3000';
 
 // Configuration et variables globales
 let currentStep = 1;
