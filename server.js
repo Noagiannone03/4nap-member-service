@@ -36,26 +36,32 @@ app.use(helmet({
     contentSecurityPolicy: false // Désactivé pour permettre les appels cross-origin
 }));
 
-// CORS permissif pour accepter tous les domaines
+// CORS permissif pour accepter tous les domaines (développement)
 app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: false
+    origin: true, // Accepte toutes les origines
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+    credentials: false,
+    optionsSuccessStatus: 200 // Pour les anciens navigateurs
 }));
 
-// Headers CORS supplémentaires
+// Headers CORS supplémentaires pour plus de compatibilité
 app.use((req, res, next) => {
+    // Log de debug
+    console.log(`${req.method} ${req.path} - Origin: ${req.get('Origin') || 'none'}`);
+    
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Max-Age', '86400'); // Cache preflight 24h
     
     // Répondre aux requêtes OPTIONS (preflight)
     if (req.method === 'OPTIONS') {
-        res.sendStatus(200);
-    } else {
-        next();
+        console.log('🔧 Requête OPTIONS (preflight) reçue pour:', req.path);
+        return res.status(200).end();
     }
+    
+    next();
 });
 
 // Limitation du taux de requêtes
