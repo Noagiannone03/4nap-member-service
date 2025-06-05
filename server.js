@@ -10,8 +10,8 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 require('dotenv').config();
 
-// Import wallet integration
-const { generateWalletButtons, setupWalletRoutes } = require('./wallet-integration');
+// Import wallet integration (version simple - sans API)
+const { generateSimpleWalletButtons, setupSimpleWalletRoutes } = require('./wallet-simple');
 
 // Configuration de l'application
 const app = express();
@@ -160,8 +160,8 @@ app.post('/api/send-membership-email', emailLimiter, async (req, res) => {
     }
 });
 
-// Configuration des routes wallet
-setupWalletRoutes(app);
+// Configuration des routes wallet (version simple)
+setupSimpleWalletRoutes(app);
 
 // Fonctions utilitaires
 
@@ -311,7 +311,7 @@ async function sendMembershipEmail(member, pdfPath) {
 
 // Génération du HTML de l'email
 function generateEmailHTML(member) {
-    const walletButtons = generateWalletButtons(member);
+    const walletButtons = generateSimpleWalletButtons(member);
     
     return `
     <!DOCTYPE html>
@@ -345,7 +345,7 @@ function generateEmailHTML(member) {
                     <p><strong>ID Membre:</strong> ${member.memberId}</p>
                 </div>
                 
-                ${walletButtons.bothButtons}
+                ${walletButtons.simpleButtons}
                 
                 <p>📱 Votre pass fidélité QR code unique est également joint à cet email en PDF.</p>
                 <p>🏰 Nous avons hâte de vous accueillir au Fort Napoléon !</p>
