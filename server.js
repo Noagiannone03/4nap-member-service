@@ -325,7 +325,7 @@ async function sendWelcomeEmailWithMembership(email, firstName, lastName, purcha
                         <p>Pour obtenir votre carte membre avec QR code, cliquez sur le bouton ci-dessous :</p>
                         
                         <div style="text-align: center; margin: 30px 0;">
-                            <a href="https://4nap.fr/?welcome=${memberId}&email=${encodeURIComponent(email)}&name=${encodeURIComponent(firstName + ' ' + lastName)}" 
+                            <a href="https://noagiannone03.github.io/4nap-member-service/public/inscription.html" 
                                style="background: linear-gradient(135deg, #00ff88, #0099ff); color: white; text-decoration: none; padding: 15px 30px; border-radius: 8px; font-weight: 600; display: inline-block; transition: transform 0.2s;">
                                 🎫 Générer ma Carte Membre
                             </a>
