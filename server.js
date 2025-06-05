@@ -227,14 +227,14 @@ app.post('/webhook/helloasso', async (req, res) => {
         
         // Vérifier que c'est bien un paiement
         if (webhookData.eventType === 'Payment' && webhookData.data) {
-            const payment = webhookData.data;
-            const payer = payment.payer;
+            const data = webhookData.data;
+            const payer = data.payer;
             
             // Extraire les informations importantes
             const email = payer.email;
             const firstName = payer.firstName || 'Ami(e)';
             const lastName = payer.lastName || '';
-            const amount = payment.amount / 100; // HelloAsso envoie en centimes
+            const amount = data.amount / 100; // HelloAsso envoie en centimes
             
             console.log(`💰 Nouveau paiement de ${firstName} ${lastName} (${email}) : ${amount}€`);
             
