@@ -1,162 +1,220 @@
-// Importation des modules
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid');
+const bodyParser = require('body-parser');
 const QRCode = require('qrcode');
 const nodemailer = require('nodemailer');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 require('dotenv').config();
 
-// Import wallet integration
-const { generateWalletButtons, setupWalletRoutes } = require('./wallet-integration');
-
 // Configuration de l'application
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configuration Nodemailer
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+app.use(express.static('public'));
+
+// Configuration du transporteur email
 let transporter;
-try {
-    transporter = nodemailer.createTransport({
-        host: 'mail73.lwspanel.com',
-        port: 465,
-        secure: true,
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-        }
-    });
-    console.log('✅ Configuration email initialisée');
-} catch (error) {
-    console.error('❌ Erreur configuration email:', error.message);
+
+async function setupEmailTransporter() {
+    try {
+        transporter = nodemailer.createTransport({
+            host: 'mail73.lwspanel.com',
+            port: 465,
+            secure: true,
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+            }
+        });
+
+        // Test de la connexion
+        await transporter.verify();
+        console.log('✅ Configuration email OK');
+        return true;
+    } catch (error) {
+        console.error('❌ Erreur configuration email:', error.message);
+        return false;
+    }
 }
 
-// Middleware de sécurité
-app.use(helmet({
-    contentSecurityPolicy: false // Désactivé pour permettre les appels cross-origin
-}));
-
-// CORS permissif pour accepter tous les domaines (développement)
-app.use(cors({
-    origin: true, // Accepte toutes les origines
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
-    credentials: false,
-    optionsSuccessStatus: 200 // Pour les anciens navigateurs
-}));
-
-// Headers CORS supplémentaires pour plus de compatibilité
-app.use((req, res, next) => {
-    // Log de debug
-    console.log(`${req.method} ${req.path} - Origin: ${req.get('Origin') || 'none'}`);
-    
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.header('Access-Control-Max-Age', '86400'); // Cache preflight 24h
-    
-    // Répondre aux requêtes OPTIONS (preflight)
-    if (req.method === 'OPTIONS') {
-        console.log('🔧 Requête OPTIONS (preflight) reçue pour:', req.path);
-        return res.status(200).end();
+// Fonction pour générer un QR code
+async function generateQRCode(text) {
+    try {
+        return await QRCode.toDataURL(text);
+    } catch (error) {
+        console.error('Erreur génération QR code:', error);
+        throw error;
     }
-    
-    next();
-});
+}
 
-// Limitation du taux de requêtes
-const emailLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 heure
-    max: 10, // Limite à 10 emails par heure par IP
-    message: {
-        error: 'Limite d\'emails atteinte, veuillez réessayer plus tard.'
-    }
-});
+// Fonction pour générer un PDF avec QR code
+function generatePDF(member) {
+    return new Promise((resolve, reject) => {
+        try {
+            const doc = new PDFDocument();
+            const chunks = [];
+            
+            doc.on('data', chunk => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            
+            // En-tête
+            doc.fontSize(20).fillColor('#2c3e50').text('CARTE DE MEMBRE', 50, 50);
+            doc.fontSize(16).fillColor('#34495e').text('Fort Napoléon - La Seyne-sur-Mer', 50, 80);
+            
+            // Informations du membre
+            doc.fontSize(12).fillColor('#2c3e50');
+            doc.text(`Nom: ${member.prenom} ${member.nom}`, 50, 120);
+            doc.text(`Type: ${member.typeMembre}`, 50, 140);
+            doc.text(`ID Membre: ${member.memberId}`, 50, 160);
+            doc.text(`Date d'expiration: ${member.dateExpiration}`, 50, 180);
+            
+            // QR Code (sera ajouté après génération)
+            doc.text('QR Code à scanner:', 50, 220);
+            
+            doc.end();
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Créer les dossiers nécessaires
-const dirs = ['temp', 'qr-codes'];
-dirs.forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-});
-
-// Route de test
+// Routes principales
 app.get('/', (req, res) => {
     res.json({
-        message: '4nap Email Service',
-        status: 'online',
+        status: 'OK',
+        message: '🚀 Serveur Email 4nap opérationnel',
+        timestamp: new Date().toISOString(),
         endpoints: {
-            email: 'POST /api/send-membership-email',
-            test: 'GET /api/test'
+            'GET /api/test': 'Test du serveur',
+            'POST /api/send-membership-email': 'Envoi email membre',
+            'POST /webhook/helloasso': 'Webhook HelloAsso'
         }
     });
 });
 
-// Route de test
 app.get('/api/test', (req, res) => {
     res.json({
-        success: true,
-        message: 'Serveur email 4nap fonctionnel',
+        status: 'success',
+        message: 'API fonctionnelle',
         timestamp: new Date().toISOString(),
-        email_configured: !!transporter
+        email: transporter ? 'Configuré' : 'Non configuré'
     });
 });
 
-// API: Envoyer email de membership
-app.post('/api/send-membership-email', emailLimiter, async (req, res) => {
+// Route principale pour envoyer un email de membre
+app.post('/api/send-membership-email', async (req, res) => {
     try {
-        const memberData = req.body;
-        
-        // Validation des données essentielles
-        if (!memberData.email || !memberData.prenom || !memberData.nom || !memberData.memberId) {
-            return res.status(400).json({
-                error: 'Données manquantes',
-                required: ['email', 'prenom', 'nom', 'memberId']
-            });
+        const { memberId, email, prenom, nom, typeMembre } = req.body;
+
+        if (!email || !prenom || !nom) {
+            return res.status(400).json({ error: 'Données manquantes' });
         }
 
-        // Générer le QR code
-        const qrCodeData = await generateQRCode(memberData.memberId);
-        
-        // Ajouter le QR code aux données du membre
-        memberData.qrCodeData = qrCodeData;
+        console.log(`📧 Envoi email pour: ${prenom} ${nom} (${email})`);
 
-        // Générer le PDF
-        const pdfPath = await generateMembershipPDF(memberData);
-        
-        // Envoyer l'email
-        const emailSent = await sendMembershipEmail(memberData, pdfPath);
-        
-        // Nettoyer le fichier PDF temporaire
-        if (fs.existsSync(pdfPath)) {
-            fs.unlinkSync(pdfPath);
-        }
-
-        if (emailSent) {
-            res.json({
-                success: true,
-                message: 'Email envoyé avec succès',
-                qrCode: qrCodeData
-            });
+        // Calculer la date d'expiration
+        const dateExpiration = new Date();
+        if (typeMembre === 'annuel') {
+            dateExpiration.setFullYear(dateExpiration.getFullYear() + 1);
         } else {
-            res.status(500).json({
-                error: 'Erreur lors de l\'envoi de l\'email'
-            });
+            dateExpiration.setMonth(dateExpiration.getMonth() + 1);
         }
+
+        const member = {
+            memberId: memberId || `4NAP-${Date.now()}`,
+            prenom,
+            nom,
+            email,
+            typeMembre: typeMembre || 'annuel',
+            dateExpiration: dateExpiration.toLocaleDateString('fr-FR')
+        };
+
+        // Générer QR code avec les infos membre
+        const qrData = `Membre 4nap: ${member.prenom} ${member.nom} - ID: ${member.memberId} - Expire: ${member.dateExpiration}`;
+        const qrCodeDataURL = await generateQRCode(qrData);
+
+        // Email HTML
+        const emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f5f7fa; }
+                .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }
+                .content { padding: 40px 30px; }
+                .highlight { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold; }
+                .qr-section { background: #f8f9ff; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center; }
+                .member-info { background: #e8f4fd; border-left: 4px solid #2196F3; padding: 20px; margin: 20px 0; border-radius: 8px; }
+                .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 14px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🎉 Bienvenue ${member.prenom} !</h1>
+                    <p>Votre carte de membre est prête</p>
+                </div>
+                
+                <div class="content">
+                    <p>Bonjour <strong>${member.prenom}</strong> ! 👋</p>
+                    
+                    <p>Félicitations ! Votre <span class="highlight">carte de membre du Fort Napoléon</span> a été générée avec succès ! 🏰✨</p>
+                    
+                    <div class="qr-section">
+                        <h3>🎫 Votre QR Code Membre</h3>
+                        <img src="${qrCodeDataURL}" alt="QR Code Membre" style="max-width: 200px; margin: 20px 0;">
+                        <p><strong>Présentez ce QR code</strong> lors de votre visite au Fort Napoléon</p>
+                    </div>
+                    
+                    <div class="member-info">
+                        <h4>📋 Informations de votre carte :</h4>
+                        <ul>
+                            <li><strong>Nom :</strong> ${member.prenom} ${member.nom}</li>
+                            <li><strong>ID Membre :</strong> ${member.memberId}</li>
+                            <li><strong>Type :</strong> ${member.typeMembre}</li>
+                            <li><strong>Valable jusqu'au :</strong> ${member.dateExpiration}</li>
+                        </ul>
+                    </div>
+                    
+                    <p>Nous avons hâte de vous accueillir au Fort Napoléon ! 🌊</p>
+                    
+                    <p>L'équipe 4nap 💙</p>
+                </div>
+                
+                <div class="footer">
+                    <p>🏰 Fort Napoléon • La Seyne-sur-Mer<br>
+                    📧 contact@4nap.fr • 🌐 4nap.fr</p>
+                </div>
+            </div>
+        </body>
+        </html>`;
+
+        const mailOptions = {
+            from: process.env.SMTP_USER,
+            to: email,
+            subject: `🎫 ${prenom}, votre carte membre Fort Napoléon est prête !`,
+            html: emailHtml
+        };
+
+        const result = await transporter.sendMail(mailOptions);
+        console.log(`✅ Email envoyé à ${email}:`, result.messageId);
+
+        res.json({
+            success: true,
+            message: 'Email envoyé avec succès',
+            memberId: member.memberId,
+            messageId: result.messageId
+        });
 
     } catch (error) {
-        console.error('❌ Erreur lors de l\'envoi de l\'email:', error);
-        res.status(500).json({
-            error: 'Erreur interne du serveur',
-            message: error.message
-        });
+        console.error('❌ Erreur envoi email:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -170,7 +228,6 @@ app.post('/webhook/helloasso', async (req, res) => {
         // Vérifier que c'est bien un paiement
         if (webhookData.eventType === 'Payment' && webhookData.data) {
             const payment = webhookData.data;
-            const order = payment.order;
             const payer = payment.payer;
             
             // Extraire les informations importantes
@@ -188,19 +245,8 @@ app.post('/webhook/helloasso', async (req, res) => {
             const expirationDate = new Date();
             expirationDate.setFullYear(expirationDate.getFullYear() + 1);
             
-            // Créer le member pour le pass
-            const member = {
-                id: memberId,
-                firstName: firstName,
-                lastName: lastName,
-                email: email,
-                type: 'Membre Fort Nap',
-                expirationDate: expirationDate.toLocaleDateString('fr-FR'),
-                source: 'HelloAsso Purchase'
-            };
-            
-            // Envoyer l'email de bienvenue avec pass
-            await sendWelcomeEmailWithPass(member, amount);
+            // Envoyer l'email de bienvenue
+            await sendWelcomeEmailWithMembership(email, firstName, lastName, amount, memberId, expirationDate);
             
             res.status(200).json({ success: true, message: 'Webhook traité avec succès' });
         } else {
@@ -221,41 +267,11 @@ app.post('/api/send-helloasso-webhook', async (req, res) => {
         
         console.log(`🧪 Test webhook HelloAsso: ${prenom} (${email}) - ${montant}€`);
         
-        // Simuler un webhook HelloAsso
-        const fakeWebhook = {
-            eventType: 'Payment',
-            data: {
-                amount: montant * 100, // Convertir en centimes
-                payer: {
-                    email: email,
-                    firstName: prenom,
-                    lastName: 'Test'
-                },
-                order: {
-                    id: `test_${Date.now()}`
-                }
-            }
-        };
-        
-        // Traiter comme un vrai webhook
-        const payment = fakeWebhook.data;
-        const payer = payment.payer;
-        
         const memberId = 'TEST-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         const expirationDate = new Date();
         expirationDate.setFullYear(expirationDate.getFullYear() + 1);
         
-        const member = {
-            id: memberId,
-            firstName: payer.firstName,
-            lastName: payer.lastName,
-            email: payer.email,
-            type: 'Membre Fort Nap (Test)',
-            expirationDate: expirationDate.toLocaleDateString('fr-FR'),
-            source: 'HelloAsso Test'
-        };
-        
-        await sendWelcomeEmailWithPass(member, montant);
+        await sendWelcomeEmailWithMembership(email, prenom, 'Test', montant, memberId, expirationDate);
         
         res.json({ 
             success: true, 
@@ -269,218 +285,12 @@ app.post('/api/send-helloasso-webhook', async (req, res) => {
     }
 });
 
-// Configuration des routes wallet
-setupWalletRoutes(app);
-
-// Fonctions utilitaires
-
-// Génération du QR code
-async function generateQRCode(memberId) {
+// Fonction pour envoyer l'email de bienvenue HelloAsso
+async function sendWelcomeEmailWithMembership(email, firstName, lastName, purchaseAmount, memberId, expirationDate) {
     try {
-        const qrData = {
-            type: '4nap-member',
-            memberId: memberId,
-            timestamp: Date.now(),
-            version: '1.0'
-        };
-        
-        const qrCodeDataURL = await QRCode.toDataURL(JSON.stringify(qrData), {
-            type: 'image/png',
-            quality: 0.92,
-            margin: 1,
-            color: {
-                dark: '#000000',
-                light: '#FFFFFF'
-            },
-            width: 256
-        });
-        
-        console.log(`✅ QR code généré pour le membre ${memberId}`);
-        return qrCodeDataURL;
-        
-    } catch (error) {
-        console.error('❌ Erreur lors de la génération du QR code:', error);
-        throw error;
-    }
-}
-
-// Génération du PDF de membership
-async function generateMembershipPDF(member) {
-    return new Promise((resolve, reject) => {
-        try {
-            const pdfPath = `temp/membership-${member.memberId}-${Date.now()}.pdf`;
-            const doc = new PDFDocument({ margin: 50 });
-            const stream = fs.createWriteStream(pdfPath);
-            
-            doc.pipe(stream);
-            
-            // En-tête
-            doc.fontSize(24)
-               .fillColor('#00d4ff')
-               .text('4nap - Fort Napoléon', 50, 50);
-               
-            doc.fontSize(16)
-               .fillColor('#666666')
-               .text('Pass Fidélité Membre', 50, 80);
-            
-            // Ligne de séparation
-            doc.moveTo(50, 110)
-               .lineTo(550, 110)
-               .strokeColor('#00d4ff')
-               .lineWidth(2)
-               .stroke();
-            
-            // Informations du membre
-            doc.fontSize(14)
-               .fillColor('#000000')
-               .text('Informations du Membre', 50, 140);
-            
-            const memberInfo = [
-                `Nom: ${member.nom}`,
-                `Prénom: ${member.prenom}`,
-                `Email: ${member.email}`,
-                `Type: ${member.typeMembre || 'Membre'}`,
-                `Date d'inscription: ${new Date().toLocaleDateString('fr-FR')}`,
-                `ID Membre: ${member.memberId}`
-            ];
-            
-            let yPos = 170;
-            memberInfo.forEach(info => {
-                doc.text(info, 50, yPos);
-                yPos += 25;
-            });
-            
-            // QR Code
-            if (member.qrCodeData) {
-                const base64Data = member.qrCodeData.replace(/^data:image\/png;base64,/, '');
-                const qrBuffer = Buffer.from(base64Data, 'base64');
-                doc.image(qrBuffer, 350, 140, { width: 150 });
-            }
-            
-            // Instructions
-            doc.fontSize(12)
-               .fillColor('#666666')
-               .text('Instructions:', 50, 400)
-               .text('• Présentez ce QR code lors de votre visite au Fort Napoléon', 50, 420)
-               .text('• Ce pass est personnel et non transférable', 50, 440)
-               .text('• Conservez ce document précieusement', 50, 460);
-            
-            // Pied de page
-            doc.fontSize(10)
-               .fillColor('#999999')
-               .text('4nap - Fort Napoléon, La Seyne-sur-Mer', 50, 700)
-               .text('www.4nap.fr | contact@4nap.fr', 50, 715);
-            
-            doc.end();
-            
-            stream.on('finish', () => {
-                console.log(`✅ PDF généré: ${pdfPath}`);
-                resolve(pdfPath);
-            });
-            
-            stream.on('error', reject);
-            
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
-
-// Envoi de l'email de membership
-async function sendMembershipEmail(member, pdfPath) {
-    if (!transporter) {
-        console.log('⚠️  Configuration email manquante');
-        return false;
-    }
-    
-    try {
-        const mailOptions = {
-            from: `"4nap - Fort Napoléon" <${process.env.SMTP_USER}>`,
-            to: member.email,
-            subject: '🎉 Bienvenue dans l\'équipe 4nap ! Votre pass fidélité',
-            html: generateEmailHTML(member),
-            attachments: [
-                {
-                    filename: `4nap-pass-fidelite-${member.prenom}-${member.nom}.pdf`,
-                    path: pdfPath,
-                    contentType: 'application/pdf'
-                }
-            ]
-        };
-        
-        const info = await transporter.sendMail(mailOptions);
-        console.log('✅ Email envoyé:', info.messageId);
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Erreur lors de l\'envoi de l\'email:', error);
-        return false;
-    }
-}
-
-// Génération du HTML de l'email
-function generateEmailHTML(member) {
-    const walletButtons = generateWalletButtons(member);
-    
-    return `
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-            .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; }
-            .header { background: linear-gradient(135deg, #00d4ff, #9933ff); padding: 40px; text-align: center; color: white; }
-            .content { padding: 40px; }
-            .welcome { text-align: center; margin-bottom: 30px; }
-            .member-info { background: #f8f9fa; border-radius: 15px; padding: 25px; margin: 20px 0; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>4nap</h1>
-                <p>Fort Napoléon - La Seyne</p>
-            </div>
-            <div class="content">
-                <div class="welcome">
-                    <h2>🎉 Bienvenue ${member.prenom} !</h2>
-                    <p>Félicitations ! Vous êtes maintenant membre de la communauté 4nap.</p>
-                </div>
-                <div class="member-info">
-                    <h3>📋 Vos informations</h3>
-                    <p><strong>Nom:</strong> ${member.prenom} ${member.nom}</p>
-                    <p><strong>Email:</strong> ${member.email}</p>
-                    <p><strong>ID Membre:</strong> ${member.memberId}</p>
-                </div>
-                
-                ${walletButtons.bothButtons}
-                
-                <p>📱 Votre pass fidélité QR code unique est également joint à cet email en PDF.</p>
-                <p>🏰 Nous avons hâte de vous accueillir au Fort Napoléon !</p>
-                
-                <div style="margin-top: 30px; padding: 20px; background: #e8f4fd; border-radius: 10px; border-left: 4px solid #00d4ff;">
-                    <h4 style="margin: 0 0 10px 0; color: #0066cc;">💡 Comment utiliser votre pass :</h4>
-                    <ul style="margin: 10px 0; padding-left: 20px; color: #333;">
-                        <li>🎯 <strong>Ajoutez à votre wallet</strong> : Cliquez sur un bouton ci-dessus</li>
-                        <li>📱 <strong>Accès rapide</strong> : Votre QR code sera accessible depuis l'écran de verrouillage</li>
-                        <li>🏰 <strong>Au Fort</strong> : Présentez le QR code à l'entrée</li>
-                        <li>📄 <strong>Alternative</strong> : Utilisez le PDF joint à cet email</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
-}
-
-// Fonction pour envoyer l'email de bienvenue avec pass membre
-async function sendWelcomeEmailWithPass(member, purchaseAmount) {
-    try {
-        // Générer les liens wallet
-        const googleWalletUrl = `https://4nap.fr/wallet/google/${member.id}`;
-        const appleWalletUrl = `https://4nap.fr/wallet/apple/${member.id}`;
+        // Générer QR code avec les infos membre
+        const qrData = `Membre 4nap: ${firstName} ${lastName} - ID: ${memberId} - Expire: ${expirationDate.toLocaleDateString('fr-FR')}`;
+        const qrCodeDataURL = await generateQRCode(qrData);
         
         const emailHtml = `
         <!DOCTYPE html>
@@ -493,45 +303,30 @@ async function sendWelcomeEmailWithPass(member, purchaseAmount) {
                 .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }
                 .content { padding: 40px 30px; }
                 .highlight { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold; }
-                .wallet-section { background: #f8f9ff; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center; }
-                .wallet-buttons { display: flex; gap: 15px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
-                .wallet-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: transform 0.2s; }
-                .google-wallet { background: #4285f4; color: white; }
-                .apple-wallet { background: #000; color: white; }
-                .wallet-btn:hover { transform: translateY(-2px); }
+                .qr-section { background: #f8f9ff; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center; }
                 .fort-info { background: #e8f4fd; border-left: 4px solid #2196F3; padding: 20px; margin: 20px 0; border-radius: 8px; }
                 .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 14px; }
-                .emoji { font-size: 1.2em; }
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🎉 Merci ${member.firstName} !</h1>
+                    <h1>🎉 Merci ${firstName} !</h1>
                     <p>Votre achat nous fait énormément plaisir</p>
                 </div>
                 
                 <div class="content">
-                    <p>Bonjour <strong>${member.firstName}</strong> ! 👋</p>
+                    <p>Bonjour <strong>${firstName}</strong> ! 👋</p>
                     
                     <p>Nous venons de voir que vous avez effectué un achat de <span class="highlight">${purchaseAmount}€</span> sur notre billetterie HelloAsso ! 🎫</p>
                     
                     <p>Pour vous remercier de votre confiance, nous avons le plaisir de vous <strong>offrir un abonnement de membre du Fort Napoléon pendant 12 mois</strong> ! 🏰✨</p>
                     
-                    <div class="wallet-section">
-                        <h3>🎁 Votre Pass Membre est prêt !</h3>
-                        <p>Ajoutez-le directement à votre smartphone :</p>
-                        
-                        <div class="wallet-buttons">
-                            <a href="${googleWalletUrl}" class="wallet-btn google-wallet">
-                                📱 Ajouter à Google Wallet
-                            </a>
-                            <a href="${appleWalletUrl}" class="wallet-btn apple-wallet">
-                                🍎 Ajouter à Apple Wallet
-                            </a>
-                        </div>
-                        
-                        <p><small>💡 <strong>Astuce :</strong> Votre pass sera toujours accessible dans l'app Wallet de votre téléphone !</small></p>
+                    <div class="qr-section">
+                        <h3>🎁 Votre Carte Membre est prête !</h3>
+                        <img src="${qrCodeDataURL}" alt="QR Code Membre" style="max-width: 200px; margin: 20px 0;">
+                        <p><strong>Présentez ce QR code</strong> lors de votre visite au Fort Napoléon</p>
+                        <p><small>💡 <strong>Astuce :</strong> Sauvegardez cette image ou imprimez cet email !</small></p>
                     </div>
                     
                     <div class="fort-info">
@@ -542,7 +337,8 @@ async function sendWelcomeEmailWithPass(member, purchaseAmount) {
                             <li><strong>Invitations</strong> aux vernissages privés</li>
                             <li><strong>Newsletter exclusive</strong> avec les coulisses</li>
                         </ul>
-                        <p><strong>📅 Valable jusqu'au ${member.expirationDate}</strong></p>
+                        <p><strong>📅 Valable jusqu'au ${expirationDate.toLocaleDateString('fr-FR')}</strong></p>
+                        <p><strong>🆔 ID Membre : ${memberId}</strong></p>
                     </div>
                     
                     <p>Nous avons hâte de vous accueillir au Fort Napoléon ! 🌊</p>
@@ -560,13 +356,13 @@ async function sendWelcomeEmailWithPass(member, purchaseAmount) {
         
         const mailOptions = {
             from: process.env.SMTP_USER,
-            to: member.email,
-            subject: `🎁 ${member.firstName}, votre pass membre Fort Napoléon vous attend !`,
+            to: email,
+            subject: `🎁 ${firstName}, votre pass membre Fort Napoléon vous attend !`,
             html: emailHtml
         };
         
         const result = await transporter.sendMail(mailOptions);
-        console.log(`✅ Email de bienvenue envoyé à ${member.email}:`, result.messageId);
+        console.log(`✅ Email de bienvenue envoyé à ${email}:`, result.messageId);
         
         return result;
         
@@ -579,45 +375,38 @@ async function sendWelcomeEmailWithPass(member, purchaseAmount) {
 // Gestion des erreurs 404
 app.use((req, res) => {
     res.status(404).json({
-        error: 'Endpoint non trouvé',
-        available_endpoints: [
-            'GET /',
-            'GET /api/test',
-            'POST /api/send-membership-email'
-        ]
-    });
-});
-
-// Gestion des erreurs globales
-app.use((err, req, res, next) => {
-    console.error('❌ Erreur serveur:', err.stack);
-    res.status(500).json({
-        error: 'Erreur interne du serveur'
+        error: 'Route non trouvée',
+        availableRoutes: ['/', '/api/test', '/api/send-membership-email', '/webhook/helloasso']
     });
 });
 
 // Démarrage du serveur
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`
-🚀 Serveur Email 4nap démarré !
-📍 URL: http://localhost:${PORT}
-🌍 Accessible sur: http://0.0.0.0:${PORT}
-📧 Email configuré: ${transporter ? '✅' : '❌'}
-🎯 Endpoints:
-   GET  / - Info serveur
-   GET  /api/test - Test serveur
-   POST /api/send-membership-email - Envoi email
-    `);
+async function startServer() {
+    const emailReady = await setupEmailTransporter();
+    
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log('\n🚀 Serveur Email 4nap démarré !');
+        console.log(`📍 URL: http://localhost:${PORT}`);
+        console.log(`🌍 Accessible sur: http://0.0.0.0:${PORT}`);
+        console.log(`📧 Email configuré: ${emailReady ? '✅' : '❌'}`);
+        console.log('🎯 Endpoints:');
+        console.log('   GET  / - Info serveur');
+        console.log('   GET  /api/test - Test serveur');
+        console.log('   POST /api/send-membership-email - Envoi email');
+        console.log('   POST /webhook/helloasso - Webhook HelloAsso');
+        console.log('');
+    });
+}
+
+// Gestion de l'arrêt propre
+process.on('SIGINT', () => {
+    console.log('\n🛑 Arrêt du serveur...');
+    process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-    console.log('🛑 Arrêt du serveur...');
+    console.log('\n🛑 Arrêt du serveur...');
     process.exit(0);
 });
 
-process.on('SIGINT', () => {
-    console.log('🛑 Arrêt du serveur...');
-    process.exit(0);
-});
-
-module.exports = app; 
+startServer().catch(console.error); 
